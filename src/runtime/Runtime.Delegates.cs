@@ -25,14 +25,13 @@ public unsafe partial class Runtime
             PyThreadState_Get = (delegate* unmanaged[Cdecl]<PyThreadState*>)GetFunctionByName(nameof(PyThreadState_Get), GetUnmanagedDll(_PythonDll));
             try
             {
-                // Up until Python 3.13, this function was private and named
-                // slightly differently.
-                PyThreadState_GetUnchecked = (delegate* unmanaged[Cdecl]<PyThreadState*>)GetFunctionByName("_PyThreadState_UncheckedGet", GetUnmanagedDll(_PythonDll));
+                PyThreadState_GetUnchecked = (delegate* unmanaged[Cdecl]<PyThreadState*>)GetFunctionByName(nameof(PyThreadState_GetUnchecked), GetUnmanagedDll(_PythonDll));
             }
             catch (MissingMethodException)
             {
-
-                PyThreadState_GetUnchecked = (delegate* unmanaged[Cdecl]<PyThreadState*>)GetFunctionByName(nameof(PyThreadState_GetUnchecked), GetUnmanagedDll(_PythonDll));
+                // Up until Python 3.12, this function was private and named
+                // slightly differently.
+                PyThreadState_GetUnchecked = (delegate* unmanaged[Cdecl]<PyThreadState*>)GetFunctionByName("_PyThreadState_UncheckedGet", GetUnmanagedDll(_PythonDll));
             }
             try
             {
