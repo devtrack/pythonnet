@@ -262,7 +262,7 @@ namespace Python.Runtime
             if (!HostedInPython && !ProcessIsTerminating)
             {
                 // avoid saving dead objects
-                TryCollectingGarbage(runs: 3);
+                TryCollectingGarbage(runs: 3, pythonGC: !ShouldSkipPythonGcOnShutdown);
 
                 RuntimeData.Stash();
             }
@@ -275,7 +275,8 @@ namespace Python.Runtime
             RemoveClrRootModule();
 
             TryCollectingGarbage(MaxCollectRetriesOnShutdown, forceBreakLoops: true,
-                                 obj: true, derived: false, buffer: false);
+                                 obj: true, derived: false, buffer: false,
+                                 pythonGC: !ShouldSkipPythonGcOnShutdown);
             CLRObject.creationBlocked = true;
 
             NullGCHandles(ExtensionType.loadedExtensions);
@@ -294,8 +295,12 @@ namespace Python.Runtime
             DisposeLazyObject(hexCallable);
             PyObjectConversions.Reset();
 
-            PyGC_Collect();
-            bool everythingSeemsCollected = TryCollectingGarbage(MaxCollectRetriesOnShutdown);
+            if (!ShouldSkipPythonGcOnShutdown)
+            {
+                PyGC_Collect();
+            }
+            bool everythingSeemsCollected = TryCollectingGarbage(MaxCollectRetriesOnShutdown,
+                                                                 pythonGC: !ShouldSkipPythonGcOnShutdown);
             Debug.Assert(everythingSeemsCollected);
 
             Finalizer.Shutdown();
@@ -328,7 +333,8 @@ namespace Python.Runtime
         const int MaxCollectRetriesOnShutdown = 20;
         internal static int _collected;
         static bool TryCollectingGarbage(int runs, bool forceBreakLoops,
-                                         bool obj = true, bool derived = true, bool buffer = true)
+                                         bool obj = true, bool derived = true, bool buffer = true,
+                                         bool pythonGC = true)
         {
             if (runs <= 0) throw new ArgumentOutOfRangeException(nameof(runs));
 
@@ -340,7 +346,10 @@ namespace Python.Runtime
                 {
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
-                    pyCollected += PyGC_Collect();
+                    if (pythonGC)
+                    {
+                        pyCollected += PyGC_Collect();
+                    }
                     pyCollected += Finalizer.Instance.DisposeAll(disposeObj: obj,
                                                                  disposeDerived: derived,
                                                                  disposeBuffer: buffer);
@@ -365,6 +374,20 @@ namespace Python.Runtime
         [ForbidPythonThreads]
         public static bool TryCollectingGarbage(int runs)
             => TryCollectingGarbage(runs, forceBreakLoops: false);
+
+        static bool ShouldSkipPythonGcOnShutdown
+        {
+            get
+            {
+                if (!IsWindows)
+                {
+                    return false;
+                }
+
+                Version version = PythonEngine.GetPythonVersion();
+                return version >= new Version(3, 14);
+            }
+        }
 
         static void DisposeLazyObject(Lazy<PyObject> pyObject)
         {

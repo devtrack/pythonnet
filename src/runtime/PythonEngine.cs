@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -141,6 +143,29 @@ namespace Python.Runtime
         public static string Version
         {
             get { return Marshal.PtrToStringAnsi(Runtime.Py_GetVersion()); }
+        }
+
+        internal static Version GetPythonVersion()
+        {
+            string? versionText = Version;
+            if (string.IsNullOrWhiteSpace(versionText))
+            {
+                return new Version(0, 0);
+            }
+
+            Match match = Regex.Match(versionText, @"^(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
+            if (!match.Success)
+            {
+                return new Version(0, 0);
+            }
+
+            int major = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            int minor = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
+            int patch = match.Groups[3].Success
+                ? int.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture)
+                : 0;
+
+            return new Version(major, minor, patch);
         }
 
         public static string BuildInfo

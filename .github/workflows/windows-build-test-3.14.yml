@@ -1,0 +1,57 @@
+name: Windows Build and Test (3.14)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build and Test
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Python 3.14
+        uses: astral-sh/setup-uv@v7
+        with:
+          architecture: x64
+          python-version: '3.14'
+          cache-python: true
+          activate-environment: true
+          enable-cache: true
+
+      - name: Synchronize the virtual environment
+        run: uv sync --managed-python
+
+      - name: Show pyvenv.cfg
+        run: cat .venv/pyvenv.cfg
+
+      - name: Embedding tests (Mono/.NET Framework)
+        run: dotnet test --runtime any-x64 --framework net472 --logger "console;verbosity=detailed" src/embed_tests/
+        if: always()
+        env:
+          MONO_THREADS_SUSPEND: preemptive # https://github.com/mono/mono/issues/21466
+
+      - name: Embedding tests (.NET Core)
+        run: dotnet test --runtime any-x64 --framework net8.0 --logger "console;verbosity=detailed" src/embed_tests/
+        if: always()
+
+      - name: Python Tests (.NET Core)
+        run: pytest --runtime coreclr
+
+      - name: Python Tests (.NET Framework)
+        run: pytest --runtime netfx
+
+      - name: Python tests run from .NET
+        run: dotnet test --runtime any-x64 src/python_tests_runner/
