@@ -143,6 +143,20 @@ namespace Python.Runtime
             get { return Marshal.PtrToStringAnsi(Runtime.Py_GetVersion()); }
         }
 
+        internal static Version GetPythonVersion()
+        {
+            string? versionText = Version;
+            if (string.IsNullOrWhiteSpace(versionText))
+            {
+                return new Version(0, 0);
+            }
+
+            string versionPart = versionText.Split(' ')[0];
+            return Version.TryParse(versionPart, out Version? parsed)
+                ? parsed
+                : new Version(0, 0);
+        }
+
         public static string BuildInfo
         {
             get { return Marshal.PtrToStringAnsi(Runtime.Py_GetBuildInfo()); }
